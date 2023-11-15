@@ -6,7 +6,11 @@
 import os
 from typing import Any, Dict, List, Tuple, Union
 
-import h5py
+try:
+    import h5py
+except ImportError:
+    print("h5py is not installed.")
+
 import numpy as np
 from tqdm import tqdm
 
