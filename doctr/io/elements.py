@@ -39,7 +39,6 @@ class Element(NestedObject):
 
     def export(self) -> Dict[str, Any]:
         """Exports the object into a nested dict format"""
-
         export_dict = {k: getattr(self, k) for k in self._exported_keys}
         for children_name in self._children_names:
             if children_name in ["predictions"]:
@@ -63,6 +62,7 @@ class Word(Element):
     """Implements a word element
 
     Args:
+    ----
         value: the text string of the word
         confidence: the confidence associated with the text prediction
         geometry: bounding box of the word in format ((xmin, ymin), (xmax, ymax)) where coordinates are relative to
@@ -95,6 +95,7 @@ class Artefact(Element):
     """Implements a non-textual element
 
     Args:
+    ----
         artefact_type: the type of artefact
         confidence: the confidence of the type prediction
         geometry: bounding box of the word in format ((xmin, ymin), (xmax, ymax)) where coordinates are relative to
@@ -127,6 +128,7 @@ class Line(Element):
     """Implements a line element as a collection of words
 
     Args:
+    ----
         words: list of word elements
         geometry: bounding box of the word in format ((xmin, ymin), (xmax, ymax)) where coordinates are relative to
             the page's size. If not specified, it will be resolved by default to the smallest bounding box enclosing
@@ -181,6 +183,7 @@ class Block(Element):
     """Implements a block element as a collection of lines and artefacts
 
     Args:
+    ----
         lines: list of line elements
         artefacts: list of artefacts
         geometry: bounding box of the word in format ((xmin, ymin), (xmax, ymax)) where coordinates are relative to
@@ -231,6 +234,8 @@ class Page(Element):
     """Implements a page element as a collection of blocks
 
     Args:
+    ----
+        page: image encoded as a numpy array in uint8
         blocks: list of block elements
         page_idx: the index of the page in the input raw document
         dimensions: the page size in pixels in format (height, width)
@@ -244,6 +249,7 @@ class Page(Element):
 
     def __init__(
         self,
+        page: np.ndarray,
         blocks: List[Block],
         page_idx: int,
         dimensions: Tuple[int, int],
@@ -251,6 +257,7 @@ class Page(Element):
         language: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__(blocks=blocks)
+        self.page = page
         self.page_idx = page_idx
         self.dimensions = dimensions
         self.orientation = orientation if isinstance(orientation, dict) else dict(value=None, confidence=None)
@@ -263,24 +270,24 @@ class Page(Element):
     def extra_repr(self) -> str:
         return f"dimensions={self.dimensions}"
 
-    def show(self, page: np.ndarray, interactive: bool = True, preserve_aspect_ratio: bool = False, **kwargs) -> None:
+    def show(self, interactive: bool = True, preserve_aspect_ratio: bool = False, **kwargs) -> None:
         """Overlay the result on a given image
 
         Args:
-            page: image encoded as a numpy array in uint8
             interactive: whether the display should be interactive
             preserve_aspect_ratio: pass True if you passed True to the predictor
+            **kwargs: additional keyword arguments passed to the matplotlib.pyplot.show method
         """
-        visualize_page(self.export(), page, interactive=interactive, preserve_aspect_ratio=preserve_aspect_ratio)
+        visualize_page(self.export(), self.page, interactive=interactive, preserve_aspect_ratio=preserve_aspect_ratio)
         plt.show(**kwargs)
 
     def synthesize(self, **kwargs) -> np.ndarray:
         """Synthesize the page from the predictions
 
-        Returns:
+        Returns
+        -------
             synthesized page
         """
-
         return synthesize_page(self.export(), **kwargs)
 
     def export_as_xml(self, file_title: str = "docTR - XML export (hOCR)") -> Tuple[bytes, ET.ElementTree]:
@@ -288,9 +295,11 @@ class Page(Element):
         convention: https://github.com/kba/hocr-spec/blob/master/1.2/spec.md
 
         Args:
+        ----
             file_title: the title of the XML file
 
         Returns:
+        -------
             a tuple of the XML byte string, and its ElementTree
         """
         p_idx = self.page_idx
@@ -398,7 +407,9 @@ class KIEPage(Element):
     """Implements a KIE page element as a collection of predictions
 
     Args:
+    ----
         predictions: Dictionary with list of block elements for each detection class
+        page: image encoded as a numpy array in uint8
         page_idx: the index of the page in the input raw document
         dimensions: the page size in pixels in format (height, width)
         orientation: a dictionary with the value of the rotation angle in degress and confidence of the prediction
@@ -411,6 +422,7 @@ class KIEPage(Element):
 
     def __init__(
         self,
+        page: np.ndarray,
         predictions: Dict[str, List[Prediction]],
         page_idx: int,
         dimensions: Tuple[int, int],
@@ -418,6 +430,7 @@ class KIEPage(Element):
         language: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__(predictions=predictions)
+        self.page = page
         self.page_idx = page_idx
         self.dimensions = dimensions
         self.orientation = orientation if isinstance(orientation, dict) else dict(value=None, confidence=None)
@@ -432,24 +445,30 @@ class KIEPage(Element):
     def extra_repr(self) -> str:
         return f"dimensions={self.dimensions}"
 
-    def show(self, page: np.ndarray, interactive: bool = True, preserve_aspect_ratio: bool = False, **kwargs) -> None:
+    def show(self, interactive: bool = True, preserve_aspect_ratio: bool = False, **kwargs) -> None:
         """Overlay the result on a given image
 
         Args:
-            page: image encoded as a numpy array in uint8
             interactive: whether the display should be interactive
             preserve_aspect_ratio: pass True if you passed True to the predictor
+            **kwargs: keyword arguments passed to the matplotlib.pyplot.show method
         """
-        visualize_kie_page(self.export(), page, interactive=interactive, preserve_aspect_ratio=preserve_aspect_ratio)
+        visualize_kie_page(
+            self.export(), self.page, interactive=interactive, preserve_aspect_ratio=preserve_aspect_ratio
+        )
         plt.show(**kwargs)
 
     def synthesize(self, **kwargs) -> np.ndarray:
         """Synthesize the page from the predictions
 
+        Args:
+        ----
+            **kwargs: keyword arguments passed to the matplotlib.pyplot.show method
+
         Returns:
+        -------
             synthesized page
         """
-
         return synthesize_kie_page(self.export(), **kwargs)
 
     def export_as_xml(self, file_title: str = "docTR - XML export (hOCR)") -> Tuple[bytes, ET.ElementTree]:
@@ -457,9 +476,11 @@ class KIEPage(Element):
         convention: https://github.com/kba/hocr-spec/blob/master/1.2/spec.md
 
         Args:
+        ----
             file_title: the title of the XML file
 
         Returns:
+        -------
             a tuple of the XML byte string, and its ElementTree
         """
         p_idx = self.page_idx
@@ -527,6 +548,7 @@ class Document(Element):
     """Implements a document element as a collection of pages
 
     Args:
+    ----
         pages: list of page elements
     """
 
@@ -543,31 +565,29 @@ class Document(Element):
         """Renders the full text of the element"""
         return page_break.join(p.render() for p in self.pages)
 
-    def show(self, pages: List[np.ndarray], **kwargs) -> None:
-        """Overlay the result on a given image
-
-        Args:
-            pages: list of images encoded as numpy arrays in uint8
-        """
-        for img, result in zip(pages, self.pages):
-            result.show(img, **kwargs)
+    def show(self, **kwargs) -> None:
+        """Overlay the result on a given image"""
+        for result in self.pages:
+            result.show(**kwargs)
 
     def synthesize(self, **kwargs) -> List[np.ndarray]:
         """Synthesize all pages from their predictions
 
-        Returns:
+        Returns
+        -------
             list of synthesized pages
         """
-
         return [page.synthesize() for page in self.pages]
 
     def export_as_xml(self, **kwargs) -> List[Tuple[bytes, ET.ElementTree]]:
         """Export the document as XML (hOCR-format)
 
         Args:
+        ----
             **kwargs: additional keyword arguments passed to the Page.export_as_xml method
 
         Returns:
+        -------
             list of tuple of (bytes, ElementTree)
         """
         return [page.export_as_xml(**kwargs) for page in self.pages]
@@ -583,6 +603,7 @@ class KIEDocument(Document):
     """Implements a document element as a collection of pages
 
     Args:
+    ----
         pages: list of page elements
     """
 
